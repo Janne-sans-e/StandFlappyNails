@@ -242,7 +242,7 @@
     <div class="score-lbl">Ton score</div>
     <div class="score-big" id="go-sc">0</div>
     <div class="g4"></div>
-    <div id="go-rec" style="font-size:12px;color:#9a5060;display:none;">🏆 Ton record : <span id="go-rec-val">0</span> pts</div>
+    <div id="go-rec" style="font-size:12px;color:#9a5060;display:none;"><span id="go-rec-lbl">🏆 Ton record : </span><span id="go-rec-val">0</span> pts</div>
     <div class="g8"></div>
     <div id="go-rank" style="font-size:13px;color:#9a5060;font-style:italic;text-align:center;max-width:280px;"></div>
     <div class="g20"></div>
@@ -251,7 +251,7 @@
     <div id="go-known" style="display:none;width:100%;align-items:center;flex-direction:column;">
       <div class="tag" id="go-wb-txt"></div>
       <div class="g12"></div>
-      <button class="btn btn-p" onclick="saveKnown()">Sauvegarder mon score ✨</button>
+      <button class="btn btn-p" id="btn-save-known" onclick="saveKnown()">Sauvegarder mon score ✨</button>
       <div class="g8"></div>
       <button class="btn btn-s" onclick="startGame()">Rejouer</button>
       <div class="g8"></div>
@@ -349,7 +349,10 @@ const geti = k => parseInt(get(k)) || 0;
 //  STATE
 // ═══════════════════════════════════════════════════════
 let pendingScore = 0;
-let lbCache = null;
+let prevBest     = 0;   // best before current game started
+let lbCache      = null;
+let saving       = false;
+let lastTime     = 0;   // for delta-time
 
 // ═══════════════════════════════════════════════════════
 //  SCREEN MANAGER
@@ -398,7 +401,6 @@ async function fetchLB(force=false) {
       .order('score', { ascending: false })
       .limit(300);
     if (error) throw error;
-    // Best score per email (JS-side deduplicate)
     const best = {};
     (data||[]).forEach(r => {
       if (!best[r.email] || r.score > best[r.email].score) best[r.email] = r;
@@ -411,7 +413,7 @@ async function fetchLB(force=false) {
 async function saveScore(pseudo, email, score, optin) {
   const { error } = await db.from('scores').insert({ pseudo, email, score, optin });
   if (error) throw error;
-  lbCache = null; // invalidate cache
+  lbCache = null;
   set(LS.PS, pseudo);
   set(LS.EM, email);
   if (score > geti(LS.BEST)) set(LS.BEST, score);
@@ -436,16 +438,21 @@ async function openGameover() {
 
   document.getElementById('go-sc').textContent = pendingScore;
 
-  const best = geti(LS.BEST);
+  // Show previous best or flag a new record — never the same number as current score
+  const best  = geti(LS.BEST);
   const recEl = document.getElementById('go-rec');
-  if (best > 0) {
+  if (prevBest > 0 && best > prevBest) {
+    document.getElementById('go-rec-lbl').textContent = '🏆 Nouveau record ! ';
     document.getElementById('go-rec-val').textContent = best;
+    recEl.style.display = 'block';
+  } else if (prevBest > 0) {
+    document.getElementById('go-rec-lbl').textContent = '🏆 Ton record : ';
+    document.getElementById('go-rec-val').textContent = prevBest;
     recEl.style.display = 'block';
   } else {
     recEl.style.display = 'none';
   }
 
-  // Rank preview from cached leaderboard
   const lb = await fetchLB();
   const rankEl = document.getElementById('go-rank');
   if (lb.length === 0) {
@@ -459,7 +466,6 @@ async function openGameover() {
     }
   }
 
-  // Known or new?
   const ps = get(LS.PS), em = get(LS.EM);
   const goKnown = document.getElementById('go-known');
   const goNew   = document.getElementById('go-new');
@@ -467,6 +473,9 @@ async function openGameover() {
     goKnown.style.cssText = 'display:flex;flex-direction:column;align-items:center;width:100%;';
     goNew.style.display = 'none';
     document.getElementById('go-wb-txt').textContent = '👋 ' + ps + ', prête à sauvegarder ?';
+    // Re-enable the button in case it was disabled from a previous save
+    const btnK = document.getElementById('btn-save-known');
+    if (btnK) { btnK.disabled = false; btnK.textContent = 'Sauvegarder mon score ✨'; }
   } else {
     goKnown.style.display = 'none';
     goNew.style.cssText = 'display:flex;flex-direction:column;align-items:center;width:100%;';
@@ -524,11 +533,18 @@ async function saveKnown() {
 }
 
 async function doSave(pseudo, email, score, optin) {
-  const btn = document.getElementById('btn-sub');
-  if (btn) { btn.disabled=true; btn.textContent='Sauvegarde...'; }
+  if (saving) return;
+  saving = true;
+
+  const btnSub   = document.getElementById('btn-sub');
+  const btnKnown = document.getElementById('btn-save-known');
+  [btnSub, btnKnown].forEach(b => b && (b.disabled = true));
+  if (btnSub)   btnSub.textContent   = 'Sauvegarde...';
+  if (btnKnown) btnKnown.textContent = 'Sauvegarde... ⏳';
+
   try {
     await saveScore(pseudo, email, score, optin);
-    const lb = await fetchLB(true);
+    const lb  = await fetchLB(true);
     const idx = lb.findIndex(r => r.email === email);
     const el  = document.getElementById('saved-rank');
     el.textContent = idx >= 0
@@ -537,8 +553,12 @@ async function doSave(pseudo, email, score, optin) {
     show('s-saved');
   } catch(e) {
     console.error(e);
-    if (btn) { btn.disabled=false; btn.textContent='Sauvegarder 💅'; }
+    [btnSub, btnKnown].forEach(b => b && (b.disabled = false));
+    if (btnSub)   btnSub.textContent   = 'Sauvegarder 💅';
+    if (btnKnown) btnKnown.textContent = 'Sauvegarder mon score ✨';
     alert('Erreur lors de la sauvegarde, réessaie !');
+  } finally {
+    saving = false;
   }
 }
 
@@ -569,25 +589,23 @@ async function openLeaderboard() {
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
 
-// Logical game dimensions (scaled to canvas)
 const BW = 390, BH = 660;
 
-// Physics
-const GRAV       = 0.40;
-const JUMP_V     = -7.4;
-const PW         = 56;  // pipe width (logical)
+// Physics — smaller jumps for precise, twitchy control
+const GRAV       = 0.52;   // was 0.40
+const JUMP_V     = -5.8;   // was -7.4 — half the arc height, much more maneuverable
+const PW         = 56;
 const GAP_START  = 188;
 const GAP_MIN    = 132;
 const SPD_START  = 2.0;
 const SPD_MAX    = 4.3;
-const RAMP_END   = 900; // frames over which difficulty increases
-const PIPE_INT   = 90;  // frames between pipe spawns
-const GROUND_Y   = BH - 58; // logical ground
+const RAMP_END   = 900;
+const PIPE_INT   = 90;
+const GROUND_Y   = BH - 58;
 
-// State
-let gState = 'idle'; // idle | playing | dead
+let gState = 'idle';
 let gameScore = 0;
-let bird, pipes, frame, particles, scale;
+let bird, pipes, frame, nextPipeFrame, particles, scale;
 
 function resize() {
   const gc = document.getElementById('gc');
@@ -596,7 +614,7 @@ function resize() {
   scale = canvas.width / BW;
 }
 
-function sx(v) { return v * scale; } // scale x/y
+function sx(v) { return v * scale; }
 function sy(v) { return v * scale; }
 
 // ── DIFFICULTY RAMP ──
@@ -611,10 +629,11 @@ function resetBird() {
 }
 function resetGame() {
   resetBird();
-  pipes      = [];
-  frame      = 0;
-  gameScore  = 0;
-  particles  = [];
+  pipes         = [];
+  frame         = 0;
+  nextPipeFrame = 60 + PIPE_INT; // first pipe spawns at frame 150
+  gameScore     = 0;
+  particles     = [];
 }
 
 // ── DRAW BACKGROUND ──
@@ -625,14 +644,12 @@ function drawBg() {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Ground
   const gg = ctx.createLinearGradient(0, sy(GROUND_Y), 0, canvas.height);
   gg.addColorStop(0, '#9B1F37');
   gg.addColorStop(1, '#5C1526');
   ctx.fillStyle = gg;
   ctx.fillRect(0, sy(GROUND_Y), canvas.width, canvas.height - sy(GROUND_Y));
 
-  // Ground rim
   ctx.fillStyle = '#EBC0C8';
   ctx.fillRect(0, sy(GROUND_Y), canvas.width, sy(2));
 }
@@ -648,7 +665,6 @@ function drawNail(lx, ly, rot) {
   ctx.shadowColor = 'rgba(155,31,55,0.28)';
   ctx.shadowBlur  = sx(8);
 
-  // Body gradient
   const g = ctx.createRadialGradient(-rx*.3, -ry*.32, sx(1), 0, 0, ry);
   g.addColorStop(0, '#FFE6EE');
   g.addColorStop(.55,'#FECBD2');
@@ -660,12 +676,10 @@ function drawNail(lx, ly, rot) {
 
   ctx.shadowBlur = 0;
 
-  // Border
   ctx.strokeStyle = '#EBC0C8';
   ctx.lineWidth = sx(1.5);
   ctx.stroke();
 
-  // Nail art dots (bordeaux)
   [[-.35,.2],[.18,.3],[-.1,-.1]].forEach(([dx,dy]) => {
     ctx.fillStyle = '#9B1F37';
     ctx.beginPath();
@@ -673,7 +687,6 @@ function drawNail(lx, ly, rot) {
     ctx.fill();
   });
 
-  // Shine
   ctx.fillStyle = 'rgba(255,255,255,0.52)';
   ctx.beginPath();
   ctx.ellipse(-rx*.3, -ry*.34, rx*.36, ry*.18, -.35, 0, Math.PI*2);
@@ -706,29 +719,20 @@ function drawPipe(lx, topH, gap) {
     }
   }
 
-  // ─ TOP PIPE ─
   ctx.fillStyle = '#9B1F37';
   ctx.fillRect(x, 0, pw, sy(topH) - capH);
-  // Shadow stripe
   ctx.fillStyle = 'rgba(0,0,0,0.12)';
   ctx.fillRect(x + pw*.62, 0, pw*.14, sy(topH) - capH);
-  // Cap
   ctx.fillStyle = '#5C1526';
   ctx.fillRect(x - capExt, sy(topH) - capH, pw + capExt*2, capH);
-  // Bristles pointing down
   drawBristles(sy(topH), true);
 
-  // ─ BOTTOM PIPE ─
   const bot = topH + gap;
-  // Bristles pointing up
   drawBristles(sy(bot), false);
-  // Cap
   ctx.fillStyle = '#5C1526';
   ctx.fillRect(x - capExt, sy(bot), pw + capExt*2, capH);
-  // Body
   ctx.fillStyle = '#9B1F37';
   ctx.fillRect(x, sy(bot) + capH, pw, canvas.height - sy(bot) - capH);
-  // Shadow stripe
   ctx.fillStyle = 'rgba(0,0,0,0.12)';
   ctx.fillRect(x + pw*.62, sy(bot) + capH, pw*.14, canvas.height);
 }
@@ -738,10 +742,8 @@ function drawScore() {
   const fs = Math.round(sx(26));
   ctx.font      = `700 ${fs}px Poppins,sans-serif`;
   ctx.textAlign = 'center';
-  // Shadow
   ctx.fillStyle = 'rgba(255,255,255,0.8)';
   ctx.fillText(gameScore, canvas.width/2+sx(1), sy(50)+sy(1));
-  // Text
   ctx.fillStyle = '#9B1F37';
   ctx.fillText(gameScore, canvas.width/2, sy(50));
 }
@@ -760,11 +762,11 @@ function spawnParticles(lx, ly) {
   }
 }
 
-function tickParticles() {
+function tickParticles(dt) {
   particles = particles.filter(p=>p.life>0);
   particles.forEach(p => {
-    p.lx += p.vx; p.ly += p.vy;
-    p.vy += 0.18; p.life -= 0.045;
+    p.lx += p.vx * dt; p.ly += p.vy * dt;
+    p.vy += 0.18 * dt; p.life -= 0.045 * dt;
   });
 }
 
@@ -800,8 +802,8 @@ function doJump() {
 
 // ── IDLE FLOATER ──
 let idleF = 0;
-function drawIdle() {
-  idleF++;
+function drawIdle(dt) {
+  idleF += dt;
   ctx.clearRect(0,0,canvas.width,canvas.height);
   drawBg();
   const ly = BH*.44 + Math.sin(idleF*.05)*14;
@@ -809,25 +811,24 @@ function drawIdle() {
 }
 
 // ── GAME UPDATE ──
-function updateGame() {
-  bird.vy += GRAV;
-  bird.y  += bird.vy;
+function updateGame(dt) {
+  bird.vy += GRAV * dt;
+  bird.y  += bird.vy * dt;
   bird.rot = Math.max(-.52, Math.min(1.3, bird.vy*.06));
-  frame++;
+  frame += dt;
 
-  // Spawn pipe
-  if (frame > 60 && frame % PIPE_INT === 0) {
+  // Pipe spawn — threshold-based so floating-point frame never skips a beat
+  if (frame >= nextPipeFrame) {
+    nextPipeFrame += PIPE_INT;
     const minT = 55, maxT = GROUND_Y - pGap() - 55;
     const topH = Math.random()*(maxT-minT)+minT;
     pipes.push({ lx: BW+12, topH, gap: pGap(), scored: false });
   }
 
-  // Move pipes
   const spd = pSpeed();
-  pipes.forEach(p => p.lx -= spd);
+  pipes.forEach(p => p.lx -= spd * dt);
   pipes = pipes.filter(p => p.lx + PW > -15);
 
-  // Score
   pipes.forEach(p => {
     if (!p.scored && p.lx+PW < bird.x) {
       p.scored = true;
@@ -837,7 +838,7 @@ function updateGame() {
     }
   });
 
-  tickParticles();
+  tickParticles(dt);
 
   if (collides()) {
     gState = 'dead';
@@ -856,21 +857,28 @@ function drawGame() {
 }
 
 // ── MASTER LOOP ──
-function loop() {
+function loop(ts) {
+  const dt = lastTime ? Math.min((ts - lastTime) / (1000/60), 3) : 1;
+  lastTime = ts;
+
   if (gState === 'playing') {
-    updateGame();
-    if (gState === 'playing') drawGame();
+    updateGame(dt);
+    drawGame(); // always draw — captures the death frame too
+  } else if (gState === 'dead') {
+    // hold last drawn frame; overlay fades in above it
   } else {
-    drawIdle();
+    drawIdle(dt);
   }
+
   requestAnimationFrame(loop);
 }
 
 // ─────────────────────────────────────────────────────
 function startGame() {
+  prevBest = geti(LS.BEST); // snapshot before game updates it
   resetGame();
   gState = 'playing';
-  show(null); // hide all overlays
+  show(null);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -897,7 +905,7 @@ function init() {
     openMenu();
   }
 
-  loop();
+  requestAnimationFrame(loop);
 }
 
 init();
