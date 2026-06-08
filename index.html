@@ -148,6 +148,15 @@
     .prize .em { font-size: 22px; }
     .prize .pc { font-size: 13px; font-weight: 800; color: var(--bx); }
     .prize .pos { font-size: 10px; color: #9a5060; }
+    .prize-lucky {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--pink); border-radius: 14px;
+      padding: 10px 14px; width: 100%; max-width: 300px;
+    }
+    .prize-lucky .em { font-size: 20px; }
+    .prize-lucky .pc { font-size: 13px; font-weight: 800; color: var(--bx); }
+    .prize-lucky .pos { font-size: 10px; color: #9a5060; }
+    .g6 { height: 6px; }
 
     /* ── RULES ── */
     .rule { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #555; margin-bottom: 8px; }
@@ -204,12 +213,17 @@
       <div class="rule"><span class="ic">🎁</span><span>Top 3 = bon de réduction Janne sans e !</span></div>
     </div>
     <div class="g16"></div>
-    <div class="section-label">Les 3 meilleur·es gagnent</div>
+    <div class="section-label">Les lots à gagner</div>
     <div class="g8"></div>
     <div class="prizes">
       <div class="prize"><div class="em">🥇</div><div class="pc">-50%</div><div class="pos">1er·ère</div></div>
       <div class="prize"><div class="em">🥈</div><div class="pc">-35%</div><div class="pos">2e</div></div>
       <div class="prize"><div class="em">🥉</div><div class="pc">-20%</div><div class="pos">3e</div></div>
+    </div>
+    <div class="g6"></div>
+    <div class="prize-lucky">
+      <div class="em">🎲</div>
+      <div><div class="pc">-50% tiré au sort</div><div class="pos">parmi tous·tes les autres participant·es</div></div>
     </div>
     <div class="g24"></div>
     <button class="btn btn-p" onclick="dismissIntro()">C'est parti !</button>
@@ -226,12 +240,17 @@
     <div class="g8"></div>
     <button class="btn btn-s" onclick="openLeaderboard()" style="max-width:260px;">Voir le classement 🏆</button>
     <div class="g20"></div>
-    <div class="section-label">Gagner un bon de réduction</div>
+    <div class="section-label">Les lots à gagner</div>
     <div class="g8"></div>
     <div class="prizes">
       <div class="prize"><div class="em">🥇</div><div class="pc">-50%</div><div class="pos">1er·ère</div></div>
       <div class="prize"><div class="em">🥈</div><div class="pc">-35%</div><div class="pos">2e</div></div>
       <div class="prize"><div class="em">🥉</div><div class="pc">-20%</div><div class="pos">3e</div></div>
+    </div>
+    <div class="g6"></div>
+    <div class="prize-lucky">
+      <div class="em">🎲</div>
+      <div><div class="pc">-50% tiré au sort</div><div class="pos">parmi tous·tes les autres participant·es</div></div>
     </div>
   </div>
 
@@ -271,7 +290,7 @@
   <!-- ══════════════ SAVE MODAL ══════════════ -->
   <div id="s-save" class="scr">
     <div style="font-size:22px;font-weight:800;color:var(--bx);text-align:center;">Sauvegarde ton score ✨</div>
-    <div class="sub">Entre au classement · Tente de gagner un bon</div>
+    <div class="sub">Ces informations me permettront de te contacter en cas de victoire !</div>
     <div class="g20"></div>
     <div class="fgroup">
       <label class="flabel">Ton pseudo</label>
@@ -346,10 +365,12 @@ const geti = k => parseInt(get(k)) || 0;
 //  STATE
 // ═══════════════════════════════════════════════════════
 let pendingScore = 0;
-let prevBest     = 0;   // best before current game started
+let prevBest     = 0;
 let lbCache      = null;
+let lbFull       = [];   // full deduped sorted list for rank lookups
 let saving       = false;
-let lastTime     = 0;   // for delta-time
+let lastTime     = 0;
+let audioCtx     = null;
 
 // ═══════════════════════════════════════════════════════
 //  SCREEN MANAGER
@@ -402,15 +423,21 @@ async function fetchLB(force=false) {
     (data||[]).forEach(r => {
       if (!best[r.email] || r.score > best[r.email].score) best[r.email] = r;
     });
-    lbCache = Object.values(best).sort((a,b)=>b.score-a.score).slice(0,10);
+    lbFull  = Object.values(best).sort((a,b)=>b.score-a.score);
+    lbCache = lbFull.slice(0,10);
     return lbCache;
   } catch(e) { console.error(e); return []; }
+}
+
+function myRank(email) {
+  return lbFull.findIndex(r => r.email === email); // -1 if not found
 }
 
 async function saveScore(pseudo, email, score, optin) {
   const { error } = await db.from('scores').insert({ pseudo, email, score, optin });
   if (error) throw error;
   lbCache = null;
+  lbFull  = [];
   set(LS.PS, pseudo);
   set(LS.EM, email);
   if (score > geti(LS.BEST)) set(LS.BEST, score);
@@ -453,17 +480,26 @@ async function openGameover() {
     recEl.style.display = 'none';
   }
 
-  const lb = await fetchLB();
+  await fetchLB();
   const rankEl = document.getElementById('go-rank');
-  if (lb.length === 0) {
+  const knownEm = get(LS.EM);
+  if (knownEm && lbFull.length > 0) {
+    // Known user — show their actual rank based on all-time best
+    const idx = myRank(knownEm);
+    if (idx >= 0) {
+      const label = idx < 10 ? rankLabel(idx) : (idx+1)+'e';
+      rankEl.textContent = 'Tu es toujours ' + label + ' du classement 👀';
+    } else {
+      rankEl.textContent = 'Rejoins le classement pour voir ton rang !';
+    }
+  } else if (lbFull.length === 0) {
     rankEl.textContent = 'Tu serais premier·ère du classement ! 👑';
   } else {
-    const pos = lb.filter(r => r.score > pendingScore).length + 1;
-    if (pos <= 10 || lb.length < 10) {
-      rankEl.textContent = 'Tu aurais été ' + rankLabel(pos-1) + ' du classement 👀';
-    } else {
-      rankEl.textContent = 'Encore un effort pour entrer dans le top 10 !';
-    }
+    // Unknown user — estimate rank from this run
+    const pos = lbFull.filter(r => r.score > pendingScore).length + 1;
+    rankEl.textContent = pos <= 10 || lbFull.length < 10
+      ? 'Tu aurais été ' + rankLabel(pos-1) + ' du classement 👀'
+      : 'Encore un effort pour entrer dans le top 10 !';
   }
 
   const ps = get(LS.PS), em = get(LS.EM);
@@ -803,10 +839,49 @@ function collides() {
   return false;
 }
 
+// ── AUDIO ──
+function getAC() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+  }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playJump() {
+  const ac = getAC(); if (!ac) return;
+  const osc = ac.createOscillator(), g = ac.createGain();
+  osc.connect(g); g.connect(ac.destination);
+  const t = ac.currentTime;
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(260, t);
+  osc.frequency.exponentialRampToValueAtTime(520, t + 0.08);
+  g.gain.setValueAtTime(0.18, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+  osc.start(t); osc.stop(t + 0.13);
+}
+
+function playPoint() {
+  const ac = getAC(); if (!ac) return;
+  const t = ac.currentTime;
+  // Two-note sparkle chime (C6 + E6)
+  [[1047, 0], [1319, 0.07]].forEach(([freq, delay]) => {
+    const osc = ac.createOscillator(), g = ac.createGain();
+    osc.connect(g); g.connect(ac.destination);
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(0, t + delay);
+    g.gain.linearRampToValueAtTime(0.22, t + delay + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.2);
+    osc.start(t + delay); osc.stop(t + delay + 0.21);
+  });
+}
+
 // ── JUMP ──
 function doJump() {
   if (gState !== 'playing') return;
   bird.vy = JUMP_V;
+  playJump();
 }
 
 // ── IDLE FLOATER ──
@@ -844,6 +919,7 @@ function updateGame(dt) {
       gameScore++;
       if (gameScore > geti(LS.BEST)) set(LS.BEST, gameScore);
       spawnParticles(bird.x, bird.y-12);
+      playPoint();
     }
   });
 
