@@ -199,8 +199,6 @@
       <button class="btn btn-s" onclick="startGame()">Rejouer</button>
       <div class="g8"></div>
       <button class="btn btn-g" onclick="openLeaderboard()">Voir le classement</button>
-      <div class="g8"></div>
-      <button class="btn btn-g" onclick="notMe()">Ce n'est pas moi</button>
     </div>
     <div id="go-new" style="display:none;width:100%;align-items:center;flex-direction:column;">
       <button class="btn btn-p" onclick="openSave()">Rejoindre le classement</button>
@@ -363,9 +361,9 @@ function ease(t){ return t<0.5?2*t*t:-1+(4-2*t)*t; }
 function diffT(){ return ease(Math.min(1,Math.max(0,(frame-RAMP_START)/RAMP_END))); }
 function pSpeed(){ return SPD_START+(SPD_MAX-SPD_START)*diffT(); }
 function pGap(){ return GAP_START-(GAP_START-GAP_MIN)*diffT(); }
-function pipeInterval(){ return Math.round(PIPE_INT_BASE-35*diffT()); }
+function pipeInterval(){ return Math.round(PIPE_INT_BASE+20*diffT()); }
 function resetBird(){ bird={x:BW*0.28,y:BH*0.43,vy:0,rot:0}; }
-function resetGame(){ resetBird(); pipes=[]; frame=0; nextPipeFrame=90+PIPE_INT_BASE; gameScore=0; particles=[]; trail=[]; trailTimer=0; }
+function resetGame(){ resetBird(); pipes=[]; frame=0; nextPipeFrame=50; gameScore=0; particles=[]; trail=[]; trailTimer=0; }
 
 // ═══════════════════════════════════════════════════
 // BACKGROUND — MARSEILLE SKYLINE
