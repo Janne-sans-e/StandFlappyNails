@@ -188,6 +188,8 @@
     <div id="go-rec" style="font-size:11px;color:#9a5060;display:none;"><span id="go-rec-lbl">🏆 Record : </span><span id="go-rec-val">0</span> pts</div>
     <div class="g8"></div>
     <div id="go-rank" style="font-size:12px;color:#9a5060;font-style:italic;text-align:center;max-width:280px;"></div>
+    <div class="g8"></div>
+    <div id="go-highlight" class="tag" style="display:none;"></div>
     <div class="g20"></div>
     <div id="go-known" style="display:none;width:100%;align-items:center;flex-direction:column;">
       <div class="tag" id="go-wb-txt"></div>
@@ -199,7 +201,7 @@
       <button class="btn btn-g" onclick="notMe()">Ce n'est pas moi</button>
     </div>
     <div id="go-new" style="display:none;width:100%;align-items:center;flex-direction:column;">
-      <button class="btn btn-p" onclick="openSave()" style="font-size:17px;padding:18px 24px;box-shadow:4px 4px 0 var(--bxd);">🏆 S'inscrire au classement</button>
+      <button class="btn btn-p" id="go-new-cta" onclick="openSave()" style="font-size:17px;padding:18px 24px;box-shadow:4px 4px 0 var(--bxd);">🏆 S'inscrire au classement</button>
       <div class="g12"></div>
       <button class="btn btn-s" onclick="startGame()">Rejouer</button>
       <div class="g8"></div>
@@ -295,6 +297,22 @@ function rankLabel(i){ return i===0?'🥇 1er·ère':i===1?'🥈 2e':i===2?'🥉
 function rankClass(i){ return i===0?'lbr r1':i===1?'lbr r2':i===2?'lbr r3':'lbr'; }
 function esc(s){ return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
+function setHighlight(idx0){
+  const hl=document.getElementById('go-highlight'),cta=document.getElementById('go-new-cta');
+  if(idx0>=0&&idx0<3){
+    const pc=['-50%','-35%','-20%'][idx0],med=['🥇','🥈','🥉'][idx0];
+    hl.innerHTML=med+' Tu gagnes <b>'+pc+'</b> de réduction !';
+    hl.style.cssText='display:block;background:var(--bx);color:var(--cream);font-weight:700;';
+    if(cta) cta.textContent='🏆 S\'inscrire pour gagner '+pc;
+  }else if(idx0<0||idx0>=10){
+    hl.textContent='🎲 Inscris-toi pour le tirage au sort -50% !';
+    hl.style.cssText='display:block;background:var(--bx);color:var(--cream);font-weight:700;';
+    if(cta) cta.textContent='🎲 S\'inscrire au tirage au sort';
+  }else{
+    hl.style.display='none';
+    if(cta) cta.textContent='🏆 S\'inscrire au classement';
+  }
+}
 async function openGameover(){
   pendingScore=gameScore; show('s-go');
   document.getElementById('go-sc').textContent=pendingScore;
@@ -306,14 +324,14 @@ async function openGameover(){
   else recEl.style.display='none';
   await fetchLB();
   const rankEl=document.getElementById('go-rank'),knownEm=get(LS.EM);
-  if(knownEm&&lbFull.length>0){const idx=myRank(knownEm);if(idx>=0){const label=idx<10?rankLabel(idx):(idx+1)+'e';rankEl.textContent='Tu es toujours '+label+' du classement 👀';}else rankEl.textContent='Rejoins le classement pour voir ton rang !';}
-  else if(lbFull.length===0) rankEl.textContent='Tu serais premier·ère ! 👑';
-  else{const pos=lbFull.filter(r=>r.score>pendingScore).length+1;rankEl.textContent=pos<=10||lbFull.length<10?'Tu aurais été '+rankLabel(pos-1)+' 👀':'Encore un effort pour le top 10 !';}
+  if(knownEm&&lbFull.length>0){const idx=myRank(knownEm);if(idx>=0){const label=idx<10?rankLabel(idx):(idx+1)+'e';rankEl.textContent='Tu es toujours '+label+' du classement 👀';setHighlight(idx);}else{rankEl.textContent='Rejoins le classement pour voir ton rang !';setHighlight(-1);}}
+  else if(lbFull.length===0){ rankEl.textContent='Tu serais premier·ère ! 👑'; setHighlight(0); }
+  else{const pos=lbFull.filter(r=>r.score>pendingScore).length+1;rankEl.textContent=pos<=10||lbFull.length<10?'Tu aurais été '+rankLabel(pos-1)+' 👀':'Encore un effort pour le top 10 !';setHighlight(pos-1);}
   const ps=get(LS.PS),em=get(LS.EM),goKnown=document.getElementById('go-known'),goNew=document.getElementById('go-new');
   if(ps&&em){
     goKnown.style.cssText='display:flex;flex-direction:column;align-items:center;width:100%;'; goNew.style.display='none';
     const tag=document.getElementById('go-wb-txt'); tag.textContent='✨ Sauvegarde en cours...';
-    (async()=>{try{await saveScore(ps,em,pendingScore,false);await fetchLB(true);const idx=myRank(em);if(idx>=0){const label=idx<10?rankLabel(idx):(idx+1)+'e';rankEl.textContent='Tu es '+label+' ! 🎉';}tag.textContent='✅ Score enregistré !';}catch(e){console.error(e);tag.textContent='⚠️ Erreur réseau';}})();
+    (async()=>{try{await saveScore(ps,em,pendingScore,false);await fetchLB(true);const idx=myRank(em);if(idx>=0){const label=idx<10?rankLabel(idx):(idx+1)+'e';rankEl.textContent='Tu es '+label+' ! 🎉';setHighlight(idx);}tag.textContent='✅ Score enregistré !';}catch(e){console.error(e);tag.textContent='⚠️ Erreur réseau';}})();
   }else{goKnown.style.display='none';goNew.style.cssText='display:flex;flex-direction:column;align-items:center;width:100%;';}
 }
 function notMe(){ localStorage.removeItem(LS.PS);localStorage.removeItem(LS.EM); document.getElementById('go-known').style.display='none'; document.getElementById('go-new').style.cssText='display:flex;flex-direction:column;align-items:center;width:100%;'; }
