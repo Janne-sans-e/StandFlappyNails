@@ -303,14 +303,14 @@ function setHighlight(idx0){
     const pc=['-50%','-35%','-20%'][idx0],med=['🥇','🥈','🥉'][idx0];
     hl.innerHTML=med+' '+pc+' de réduction si tu restes à cette position jusqu\'au 31 juin';
     hl.style.display='block';
-    if(cta) cta.textContent='🏆 S\'inscrire pour gagner '+pc;
+    if(cta) cta.innerHTML='🏆 S\'inscrire pour gagner '+pc;
   }else if(idx0<0||idx0>=10){
     hl.textContent='🎲 Inscris-toi pour le tirage au sort -50% !';
     hl.style.display='block';
-    if(cta) cta.textContent='🎲 S\'inscrire au tirage au sort';
+    if(cta) cta.innerHTML='🏆 S\'inscrire au classement<br><span style="font-size:11px;font-weight:400;">et être éligible au tirage au sort</span>';
   }else{
     hl.style.display='none';
-    if(cta) cta.textContent='🏆 S\'inscrire au classement';
+    if(cta) cta.innerHTML='🏆 S\'inscrire au classement<br><span style="font-size:11px;font-weight:400;">et être éligible au tirage au sort</span>';
   }
 }
 async function openGameover(){
