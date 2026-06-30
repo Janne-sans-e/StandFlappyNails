@@ -1037,7 +1037,8 @@ function drawTapHint(){
 // ═══════════════════════════════════════════════════
 // GAME LOOP
 // ═══════════════════════════════════════════════════
-function doJump(){ if(gState==='ready'){gState='playing';bird.vy=JUMP_V;playJump();return;} if(gState!=='playing')return; bird.vy=JUMP_V;playJump(); }
+function vibrate(pattern){ if(navigator.vibrate)navigator.vibrate(pattern); }
+function doJump(){ if(gState==='ready'){gState='playing';bird.vy=JUMP_V;playJump();vibrate(10);return;} if(gState!=='playing')return; bird.vy=JUMP_V;playJump();vibrate(10); }
 
 function openGameover(){
   show('s-go');
@@ -1057,10 +1058,10 @@ function updateGame(dt){
   frame+=dt;
   if(frame>=nextPipeFrame){ nextPipeFrame+=pipeInterval(); const minT=55,maxT=GROUND_Y-pGap()-55,topH=Math.random()*(maxT-minT)+minT; pipes.push({lx:BW+12,topH,gap:pGap(),scored:false,design:Math.floor(Math.random()*NAIL_DESIGNS.length)}); }
   const spd=pSpeed(); pipes.forEach(p=>p.lx-=spd*dt); pipes=pipes.filter(p=>p.lx+PW>-20);
-  pipes.forEach(p=>{ if(!p.scored&&p.lx+PW<bird.x){p.scored=true;gameScore++;spawnParticles(bird.x,bird.y-12);playPoint();if(gameScore>=WIN_PIPES){gState='won';setTimeout(openVictory,450);}} });
+  pipes.forEach(p=>{ if(!p.scored&&p.lx+PW<bird.x){p.scored=true;gameScore++;spawnParticles(bird.x,bird.y-12);playPoint();vibrate(20);if(gameScore>=WIN_PIPES){gState='won';vibrate([30,60,30,60,80]);setTimeout(openVictory,450);}} });
   trailTimer+=dt; if(trailTimer>=1.8){emitTrail(bird.x,bird.y);trailTimer=0;}
   updateTrail(dt); tickParticles(dt);
-  if(gState==='playing'&&collides()){gState='dead';setTimeout(openGameover,550);}
+  if(gState==='playing'&&collides()){gState='dead';vibrate(120);setTimeout(openGameover,550);}
 }
 
 function drawIdleFrame(t){ ctx.clearRect(0,0,canvas.width,canvas.height); drawBg(t); const ly=BH*0.44+Math.sin(idleF*0.05)*14; emitTrail(BW*0.28,ly); updateTrail(1); drawTrail(); drawStar(BW*0.28,ly,Math.sin(idleF*0.05)*0.14); }
