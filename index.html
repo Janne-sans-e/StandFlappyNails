@@ -115,7 +115,7 @@
   <canvas id="c"></canvas>
 
   <!-- INTRO -->
-  <div id="s-intro" class="scr on">
+  <div id="s-intro" class="scr on" style="justify-content:flex-start;padding-top:56px;">
     <div class="ttl">Jeu 100% Gagnant</div>
     <div class="sub">Janne_sans_e - Nail Art - Marseille</div>
     <div class="g20"></div>
@@ -149,7 +149,7 @@
     </div>
     <div class="cbrow">
       <input type="checkbox" id="inp-opt">
-      <label for="inp-opt">Je souhaite recevoir les actualités et offres de Janne sans e</label>
+      <label for="inp-opt">Je veux être parmi les premier·es au courant des inspis, concours, promos et nouveautés !</label>
     </div>
     <button class="btn btn-p" id="btn-victory" onclick="goToBoxes()" disabled>Découvrir mon lot</button>
   </div>
@@ -157,10 +157,8 @@
   <!-- GIFT BOXES -->
   <div id="s-boxes" class="scr">
     <div style="font-family:'BrasikaDisplay',sans-serif;font-size:28px;color:var(--bx);text-align:center;">Choisis ta boîte</div>
-    <div class="sub">Une seule contient ton lot... ou pas 😉</div>
     <div class="g24"></div>
     <div class="boxes">
-      <div class="giftbox" onclick="chooseBox(this)"><span class="ribbon-bow">🎀</span></div>
       <div class="giftbox" onclick="chooseBox(this)"><span class="ribbon-bow">🎀</span></div>
       <div class="giftbox" onclick="chooseBox(this)"><span class="ribbon-bow">🎀</span></div>
     </div>
@@ -169,8 +167,6 @@
   <!-- REVEAL -->
   <div id="s-reveal" class="scr">
     <div class="confetti" id="confetti-wrap"></div>
-    <div style="font-size:44px;">✦</div>
-    <div class="g8"></div>
     <div class="section-label">Ton lot</div>
     <div class="g8"></div>
     <div class="reveal-prize" id="reveal-prize">-10€</div>
@@ -290,7 +286,7 @@ function pSpeed(){ return SPD_START+(SPD_MAX-SPD_START)*diffT(); }
 function pGap(){ return GAP_START-(GAP_START-GAP_MIN)*diffT(); }
 function pipeInterval(){ return Math.round(PIPE_INT_BASE-35*diffT()); }
 function resetBird(){ bird={x:BW*0.28,y:BH*0.43,vy:0,rot:0}; }
-function resetGame(){ resetBird(); pipes=[]; frame=0; nextPipeFrame=90+PIPE_INT_BASE; gameScore=0; particles=[]; trail=[]; trailTimer=0; }
+function resetGame(){ resetBird(); pipes=[]; frame=0; nextPipeFrame=70; gameScore=0; particles=[]; trail=[]; trailTimer=0; }
 
 // ═══════════════════════════════════════════════════
 // BACKGROUND — MARSEILLE SKYLINE
