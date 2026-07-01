@@ -243,6 +243,7 @@ function openReveal(){
   document.getElementById('reveal-prize').textContent=currentLot;
   show('s-reveal');
   fireConfetti();
+  vibrate([40,60,40,60,40,60,150]);
   finishGame();
 }
 
