@@ -174,8 +174,6 @@
     <div class="g16"></div>
     <div class="sub">Ton code te sera envoyé par email d'ici quelques minutes ✦</div>
     <div class="g24"></div>
-    <button class="btn btn-p" onclick="finishGame()">Terminer</button>
-    <div class="g16"></div>
     <div id="redirect-countdown" style="font-family:'Poppins',sans-serif;font-size:14px;color:var(--bx);opacity:0.8;text-align:center;"></div>
   </div>
 
@@ -245,6 +243,7 @@ function openReveal(){
   document.getElementById('reveal-prize').textContent=currentLot;
   show('s-reveal');
   fireConfetti();
+  finishGame();
 }
 
 function fireConfetti(){
@@ -287,7 +286,7 @@ const GAP_START=188, GAP_MIN=148, SPD_START=2.0, SPD_MAX=5.0;
 const RAMP_START=300, RAMP_END=1500, PIPE_INT_BASE=180;
 const GROUND_Y=BH-58;
 let gState='idle', gameScore=0, bird, pipes, frame, nextPipeFrame, particles, scale;
-let idleF=0, trail=[], trailTimer=0;
+let idleF=0, trail=[], trailTimer=0, pipesSpawned=0;
 
 function resize(){ const gc=document.getElementById('gc'); canvas.width=gc.offsetWidth; canvas.height=gc.offsetHeight; scale=canvas.width/BW; }
 function sx(v){ return v*scale; } function sy(v){ return v*scale; }
@@ -297,7 +296,7 @@ function pSpeed(){ return SPD_START+(SPD_MAX-SPD_START)*diffT(); }
 function pGap(){ return GAP_START-(GAP_START-GAP_MIN)*diffT(); }
 function pipeInterval(){ return Math.round(PIPE_INT_BASE-35*diffT()); }
 function resetBird(){ bird={x:BW*0.28,y:BH*0.43,vy:0,rot:0}; }
-function resetGame(){ resetBird(); pipes=[]; frame=0; nextPipeFrame=70; gameScore=0; particles=[]; trail=[]; trailTimer=0; }
+function resetGame(){ resetBird(); pipes=[]; frame=0; nextPipeFrame=70; gameScore=0; particles=[]; trail=[]; trailTimer=0; pipesSpawned=0; }
 
 // ═══════════════════════════════════════════════════
 // BACKGROUND — MARSEILLE SKYLINE
@@ -769,6 +768,8 @@ const NAIL_DESIGNS=[
   // 10. Petits poissons — bleu / jaune / rouge sur fond océan
   {body:'#79C2D6',tip:'#3E94AB',cap:'#4FA0B4',a1:'#2E66C8',a2:'#F0C42E',a3:'#D63A2E',p:'fish'},
 ];
+// Design spécial du 10ème tuyau — ligne d'arrivée à damier
+const FINISH_DESIGN={body:'#FFFFFF',tip:'#161616',cap:'#161616',p:'finish_line'};
 
 function drawNailArt(x,y,w,h,d){
   if(h<sy(8)||w<sx(6)) return;
@@ -939,6 +940,18 @@ function drawNailArt(x,y,w,h,d){
         fk++;
       }
       break;
+
+    case 'finish_line':
+      // Damier noir et blanc — ligne d'arrivée
+      const cs=sx(13);
+      const cCols=Math.ceil(w/cs)+1, cRows=Math.ceil(h/cs)+1;
+      for(let cr=0;cr<cRows;cr++){
+        for(let cc=0;cc<cCols;cc++){
+          ctx.fillStyle=(cr+cc)%2===0?'#161616':'#FFFFFF';
+          ctx.fillRect(x+cc*cs,y+cr*cs,cs,cs);
+        }
+      }
+      break;
   }
   ctx.restore();
 }
@@ -983,8 +996,7 @@ function drawFishAt(cx,cy,r,col){
   ctx.fillStyle='#FFFFFF'; ctx.beginPath(); ctx.arc(cx-r*0.52,cy-r*0.08,r*0.27,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='#16202A'; ctx.beginPath(); ctx.arc(cx-r*0.52,cy-r*0.08,r*0.13,0,Math.PI*2); ctx.fill();
 }
-function drawNailPipe(lx,topH,gap,dIdx){
-  const d=NAIL_DESIGNS[dIdx%NAIL_DESIGNS.length];
+function drawNailPipe(lx,topH,gap,d){
   const px=sx(lx), pw=sx(PW), out=PIPE_OUTLINE, ow=sx(3.4);
   const cap=d.cap||d.tip, capH=sy(30), capR=sx(15);
 
@@ -1048,7 +1060,7 @@ function drawTapHint(){
 // GAME LOOP
 // ═══════════════════════════════════════════════════
 function vibrate(pattern){ if(navigator.vibrate)navigator.vibrate(pattern); }
-function doJump(){ if(gState==='ready'){gState='playing';bird.vy=JUMP_V;playJump();vibrate(10);return;} if(gState!=='playing')return; bird.vy=JUMP_V;playJump();vibrate(10); }
+function doJump(){ if(gState==='ready'){gState='playing';bird.vy=JUMP_V;playJump();return;} if(gState!=='playing')return; bird.vy=JUMP_V;playJump(); }
 
 function openGameover(){
   show('s-go');
@@ -1066,7 +1078,7 @@ function openVictory(){
 function updateGame(dt){
   bird.vy+=GRAV*dt; bird.y+=bird.vy*dt; bird.rot=Math.max(-.52,Math.min(1.3,bird.vy*.06));
   frame+=dt;
-  if(frame>=nextPipeFrame){ nextPipeFrame+=pipeInterval(); const minT=55,maxT=GROUND_Y-pGap()-55,topH=Math.random()*(maxT-minT)+minT; pipes.push({lx:BW+12,topH,gap:pGap(),scored:false,design:Math.floor(Math.random()*NAIL_DESIGNS.length)}); }
+  if(frame>=nextPipeFrame){ nextPipeFrame+=pipeInterval(); const minT=55,maxT=GROUND_Y-pGap()-55,topH=Math.random()*(maxT-minT)+minT; pipesSpawned++; pipes.push({lx:BW+12,topH,gap:pGap(),scored:false,design:Math.floor(Math.random()*NAIL_DESIGNS.length),isFinish:pipesSpawned===WIN_PIPES}); }
   const spd=pSpeed(); pipes.forEach(p=>p.lx-=spd*dt); pipes=pipes.filter(p=>p.lx+PW>-20);
   pipes.forEach(p=>{ if(!p.scored&&p.lx+PW<bird.x){p.scored=true;gameScore++;spawnParticles(bird.x,bird.y-12);playPoint();vibrate(20);if(gameScore>=WIN_PIPES){gState='won';vibrate([30,60,30,60,80]);setTimeout(openVictory,450);}} });
   trailTimer+=dt; if(trailTimer>=1.8){emitTrail(bird.x,bird.y);trailTimer=0;}
@@ -1075,7 +1087,7 @@ function updateGame(dt){
 }
 
 function drawIdleFrame(t){ ctx.clearRect(0,0,canvas.width,canvas.height); drawBg(t); const ly=BH*0.44+Math.sin(idleF*0.05)*14; emitTrail(BW*0.28,ly); updateTrail(1); drawTrail(); drawStar(BW*0.28,ly,Math.sin(idleF*0.05)*0.14); }
-function drawGame(t){ ctx.clearRect(0,0,canvas.width,canvas.height); drawBg(t); pipes.forEach(p=>drawNailPipe(p.lx,p.topH,p.gap,p.design)); drawParticles(); drawTrail(); drawStar(bird.x,bird.y,bird.rot); drawScore(); }
+function drawGame(t){ ctx.clearRect(0,0,canvas.width,canvas.height); drawBg(t); pipes.forEach(p=>drawNailPipe(p.lx,p.topH,p.gap,p.isFinish?FINISH_DESIGN:NAIL_DESIGNS[p.design])); drawParticles(); drawTrail(); drawStar(bird.x,bird.y,bird.rot); drawScore(); }
 function startGame(){ resetGame(); gState='ready'; show(null); }
 
 function loop(ts){
