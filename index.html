@@ -86,7 +86,7 @@
 
     .rule { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #555; margin-bottom: 8px; }
     .rule .ic { font-size: 16px; min-width: 24px; text-align: center; }
-    .rule-center { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; max-width: 320px; margin-top: 14px; }
+    .rule-center { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; max-width: 320px; }
     .rule-emoji { font-size: 32px; line-height: 1; flex-shrink: 0; }
     .rule-text { font-family: 'Poppins', sans-serif; font-size: 13px; font-weight: 700; font-style: italic; color: var(--bx); line-height: 1.4; text-align: left; }
 
@@ -122,14 +122,13 @@
   <div id="s-intro" class="scr on" style="justify-content:flex-start;padding-top:56px;">
     <div class="ttl">Jeu 100% Gagnant</div>
     <div class="intro-sub">Janne_sans_e · Nail Art · Marseille</div>
-    <div style="flex:1;display:flex;align-items:flex-end;justify-content:center;width:100%;">
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;gap:14px;">
       <button class="btn btn-p" style="text-transform:uppercase;letter-spacing:0.5px;" onclick="startGame()">Jouer</button>
+      <div class="rule-center">
+        <div class="rule-emoji">🎁</div>
+        <div class="rule-text">Atteins le 10ᵉ tuyau<br>et gagne un cadeau !</div>
+      </div>
     </div>
-    <div class="rule-center">
-      <div class="rule-emoji">🎁</div>
-      <div class="rule-text">Atteins le 10ᵉ tuyau<br>et gagne un cadeau !</div>
-    </div>
-    <div class="g20"></div>
     <div class="intro-logo">
       <img src="logo.png" alt="Janne_sans_e Nail Art" width="120" height="118">
     </div>
